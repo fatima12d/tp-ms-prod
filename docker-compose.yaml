@@ -1,0 +1,134 @@
+version: "3.8"
+
+services:
+
+  # ==========================
+  # Eureka Discovery
+  # ==========================
+  discovery-service:
+    build: ./service-discovery
+    container_name: service-discovery
+    ports:
+      - "8761:8761"
+    networks:
+      - microservice-network
+
+  # ==========================
+  # API Gateway
+  # ==========================
+  service-gateway:
+    build: ./service-gateway
+    container_name: service-gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - service-discovery
+    networks:
+      - microservice-network
+
+  # ==========================
+  # PostgreSQL Client
+  # ==========================
+  postgres-client:
+    image: postgres:16
+    container_name: postgres-client
+    environment:
+      POSTGRES_DB: clientdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    networks:
+      - microservice-network
+
+  # ==========================
+  # Service Client
+  # ==========================
+  service-client:
+    build: ./service-client
+    container_name: service-client
+    ports:
+      - "8081:8081"
+    depends_on:
+      - service-discovery
+      - postgres-client
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-client:5432/clientdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    networks:
+      - microservice-network
+
+  # ==========================
+  # PostgreSQL Produit
+  # ==========================
+  postgres-produit:
+    image: postgres:16
+    container_name: postgres-produit
+    environment:
+      POSTGRES_DB: produitdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    networks:
+      - microservice-network
+
+  # ==========================
+  # Service Produit
+  # ==========================
+  service-produit:
+    build: ./service-produit
+    container_name: service-produit
+    ports:
+      - "8083:8083"
+    depends_on:
+      - service-discovery
+      - postgres-produit
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-produit:5432/produitdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    networks:
+      - microservice-network
+
+  # ==========================
+  # PostgreSQL Commande
+  # ==========================
+  postgres-commande:
+    image: postgres:16
+    container_name: postgres-commande
+    environment:
+      POSTGRES_DB: commandedb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    networks:
+      - microservice-network
+
+  # ==========================
+  # Service Commande
+  # ==========================
+  service-commande:
+    build: ./service-commande
+    container_name: service-commande
+    ports:
+      - "8082:8082"
+    depends_on:
+      - service-discovery
+      - service-client
+      - service-produit
+      - postgres-commande
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-commande:5432/commandedb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+    networks:
+      - microservice-network
+
+volumes:
+  pg-data:
+  pgadmin-data:
+networks:
+  microservice-network:
