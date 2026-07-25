@@ -1,0 +1,54 @@
+name: CI/CD Pipeline — service-commande
+
+# Déclencher le pipeline à chaque push sur main
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+
+  # ── Job 1 : Build & Push image Docker ────────────────────────
+  build-and-push:
+    name: Build & Push Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Étape 1 — Récupérer le code source
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Étape 2 — Installer Java 25
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      #Etape Generer la version a partir du numero run
+      - name: Set version
+        id: version
+        run: echo "VERSION=1.0.${{ github.run_number }}" >> $GITHUB_OUTPUT
+      # Étape 3 — Builder le JAR
+      # Équivalent TP3 : mvn package -DskipTests
+      - name: Build JAR
+        run: mvn package -DskipTests
+
+      # Étape 4 — Se connecter à Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Étape 5 — Builder et pousser l'image
+      # Équivalent TP3 : docker build -t master2:latest .
+      #                  docker push monuser/master2:latest
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/service-commande:${{ steps.version.outputs.VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/service-commande:latest
