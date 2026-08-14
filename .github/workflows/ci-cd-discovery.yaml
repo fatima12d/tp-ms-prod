@@ -19,7 +19,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Étape 2 — Installer Java 25
+      # Étape 2 — Installer Java 21
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -43,8 +43,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       # Étape 5 — Builder et pousser l'image
-      # Équivalent TP3 : docker build -t master2:latest .
-      #                  docker push monuser/master2:latest
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
