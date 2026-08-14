@@ -42,8 +42,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       # Étape 5 — Builder et pousser l'image
-      # Équivalent TP3 : docker build -t master2:latest .
-      #                  docker push monuser/master2:latest
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
