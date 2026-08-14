@@ -126,7 +126,9 @@ services:
       - microservice-network
 
 volumes:
-  pg-data:
+  client-data:
+  produit-data:
+  commande-data:
   pgadmin-data:
 networks:
   microservice-network:
