@@ -33,6 +33,7 @@ jobs:
       # Équivalent TP3 : mvn package -DskipTests
       - name: Build JAR
         run: mvn package -DskipTests
+        working-directory: service-client
 
       # Étape 4 — Se connecter à Docker Hub
       - name: Login to Docker Hub
@@ -46,7 +47,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./service-client
           push: true
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/service-client:${{ steps.version.outputs.VERSION }}
