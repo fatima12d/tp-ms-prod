@@ -10,7 +10,7 @@ import sn.isi.servicecommande.dto.ProduitDto;
         path = "/api/produits"
 )
 public interface ProduitClient {
-    @GetMapping("{id}")
+    @GetMapping("/{id}")
     ProduitDto getById(@PathVariable("id") Integer id);
 
 }

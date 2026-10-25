@@ -1,3 +1,4 @@
+
 spring:
   application:
     name: service-discovery
@@ -5,12 +6,20 @@ spring:
 server:
   port: 8761
 
+# Eureka Server
 eureka:
   client:
-    register-with-eureka: false   # ne s'enregistre pas lui-meme
-    fetch-registry: false         # ne recupere pas de registre externe
-    service-url:
-      defaultZone: http://discovery-service:8761/eureka/
-  server:
-    enable-self-preservation: false
-    eviction-interval-timer-in-ms: 5000
+    register-with-eureka: false
+    fetch-registry: false
+
+
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,refresh,metrics
+  endpoint:
+    health:
+      show-details: always

@@ -1,17 +1,19 @@
+
 spring:
   application:
     name: service-gateway
-
   cloud:
     gateway:
-      # Decouverte automatique des services Eureka
       discovery:
         locator:
           enabled: true
           lower-case-service-id: true
-
-      # Routes explicites
       routes:
+        - id: auth-service
+          uri: lb://AUTH-SERVICE
+          predicates:
+            - Path=/api/auth/**
+
         - id: service-client
           uri: lb://SERVICE-CLIENT
           predicates:
@@ -34,12 +36,28 @@ eureka:
   client:
     service-url:
       defaultZone: http://discovery-service:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
   instance:
+    prefer-ip-address: true
     instance-id: ${spring.application.name}:${random.uuid}
     lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,gateway,metrics
+        include: health,info,refresh,metrics
+  endpoint:
+    health:
+      show-details: always
+security:
+  jwt:
+    secret: "ISI-Master2-2026-TP-Microservices-JWT-Shared-Secret-Change-Me"
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.cloud.loadbalancer: DEBUG
+    reactor.netty: INFO
