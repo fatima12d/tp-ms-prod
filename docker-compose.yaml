@@ -1,5 +1,4 @@
 services:
-
   # ==========================
   # Eureka Discovery
   # ==========================
@@ -8,8 +7,42 @@ services:
     container_name: service-discovery
     ports:
       - "8761:8761"
+    environment:
+      SPRING_APPLICATION_NAME: discovery-service
+      SERVER_PORT: 8761
     networks:
       - microservice-network
+    # Force Docker à valider que l'URL d'Eureka répond positivement
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ==========================
+  # Config Server
+  # ==========================
+  config-server:
+    build: ./config-server
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    depends_on:
+      discovery-service:
+        condition: service_healthy # Attend qu'Eureka soit totalement opérationnel
+    environment:
+      SPRING_APPLICATION_NAME: config-server
+      SERVER_PORT: 8888
+      SPRING_PROFILES_ACTIVE: native
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+    networks:
+      - microservice-network
+    # Force Docker à valider que le serveur de config distribue ses fichiers
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   # ==========================
   # API Gateway
@@ -20,7 +53,14 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - discovery-service
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy # Ne démarre PAS tant que le config-server n'est pas prêt
+    environment:
+      SPRING_APPLICATION_NAME: service-gateway
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
     networks:
       - microservice-network
 
@@ -36,8 +76,15 @@ services:
       POSTGRES_PASSWORD: postgres
     ports:
       - "5433:5432"
+    volumes:
+      - client-data:/var/lib/postgresql/data
     networks:
       - microservice-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d clientdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # ==========================
   # Service Client
@@ -48,12 +95,19 @@ services:
     ports:
       - "8081:8081"
     depends_on:
-      - discovery-service
-      - postgres-client
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      postgres-client:
+        condition: service_healthy # Attend que la base accepte les connexions
     environment:
+      SPRING_APPLICATION_NAME: service-client
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-client:5432/clientdb
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
     networks:
       - microservice-network
 
@@ -69,8 +123,15 @@ services:
       POSTGRES_PASSWORD: postgres
     ports:
       - "5434:5432"
+    volumes:
+      - produit-data:/var/lib/postgresql/data
     networks:
       - microservice-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d produitdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # ==========================
   # Service Produit
@@ -81,12 +142,19 @@ services:
     ports:
       - "8083:8083"
     depends_on:
-      - discovery-service
-      - postgres-produit
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      postgres-produit:
+        condition: service_healthy
     environment:
+      SPRING_APPLICATION_NAME: service-produit
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-produit:5432/produitdb
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
     networks:
       - microservice-network
 
@@ -102,33 +170,97 @@ services:
       POSTGRES_PASSWORD: postgres
     ports:
       - "5435:5432"
+    volumes:
+      - commande-data:/var/lib/postgresql/data
     networks:
       - microservice-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d commandedb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   # ==========================
   # Service Commande
   # ==========================
   service-commande:
     build: ./service-commande
-    container_name: service-commande
+    #container_name: service-commande
     ports:
-      - "8082:8082"
+      - "8082"
     depends_on:
-      - discovery-service
-      - postgres-commande
-      - service-client
-      - service-produit
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      postgres-commande:
+        condition: service_healthy
+      service-client:
+        condition: service_started
+      service-produit:
+        condition: service_started
     environment:
+      SPRING_APPLICATION_NAME: service-commande
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-commande:5432/commandedb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+    networks:
+      - microservice-network
+    # ==========================
+  # PostgreSQL Auth (À ajouter dans votre docker-compose.yml)
+  # ==========================
+  postgres-auth:
+    image: postgres:16
+    container_name: postgres-auth
+    environment:
+      POSTGRES_DB: authdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - auth-data:/var/lib/postgresql/data
+    networks:
+      - microservice-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d authdb" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+  # ==========================
+  # Service Auth mis à jour
+  # ==========================
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    ports:
+      - "8084:8084"
+    depends_on:
+      discovery-service:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      postgres-auth:
+        condition: service_healthy
+    environment:
+      SPRING_APPLICATION_NAME: auth-service
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-service:8761/eureka/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-auth:5432/authdb
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
     networks:
       - microservice-network
 
+
 volumes:
   client-data:
   produit-data:
   commande-data:
-  pgadmin-data:
+  auth-data:
+
 networks:
   microservice-network:
+    driver: bridge

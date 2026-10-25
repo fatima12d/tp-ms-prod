@@ -18,9 +18,7 @@ public class ProduitDto {
     private String libelle;
     private String description;
     private String categorie;
-    private String codeProduit;
     private Double prix;
     private Integer quantite;
-    private LocalDate dateAjout;
     private boolean disponible;
 }
